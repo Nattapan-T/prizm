@@ -6,6 +6,7 @@ export type Violation = {
   issue: string
   fix: string
   severity: 'error' | 'warning' | 'info'
+  filename?: string
 }
 
 export type A11yIssue = {
@@ -14,6 +15,7 @@ export type A11yIssue = {
   fix: string
   wcag: string
   severity: 'error' | 'warning' | 'info'
+  filename?: string
 }
 
 export type FileResult = {
