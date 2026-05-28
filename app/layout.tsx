@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PRizm — AI Code Review for Frontend Teams",
+  title: "PRetina — AI Code Review for Frontend Teams",
   description:
     "Catch DS violations, accessibility issues, and generate PR docs instantly",
 };

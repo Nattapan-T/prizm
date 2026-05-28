@@ -184,7 +184,7 @@ export default function Home() {
               color: "var(--text-primary)",
             }}
           >
-            PR<span style={{ color: "var(--brand)" }}>izm</span>
+            PR<span style={{ color: "var(--brand)" }}>etina</span>
           </span>
         </div>
         {/* <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
