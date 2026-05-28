@@ -17,10 +17,7 @@
 
 ---
 
-<!-- Replace with your demo GIF after recording -->
-<!-- ![PRetina demo](./docs/demo.gif) -->
-
-> **Demo GIF coming soon** — see it live at [pretina-ai.vercel.app](https://pretina-ai.vercel.app)
+![PRetina demo](./docs/demo.gif)
 
 ---
 
