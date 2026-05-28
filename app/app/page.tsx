@@ -36,6 +36,21 @@ type FileResult = {
   a11y_issues: A11yIssue[];
 };
 
+type CommitMessage = {
+  type: "feat" | "fix" | "refactor" | "style" | "test" | "docs" | "chore" | "perf";
+  scope?: string;
+  description: string;
+  body?: string;
+  breaking_change: boolean;
+  breaking_change_description?: string;
+};
+
+type PRTemplate = {
+  what: string;
+  how: string;
+  testing: string;
+};
+
 // Multi-file result (mode: diff)
 type DiffResult = {
   summary: string;
@@ -49,11 +64,13 @@ type DiffResult = {
     totalDsViolations: number;
     totalA11yIssues: number;
   };
+  commit?: CommitMessage;
+  pr_template?: PRTemplate;
 };
 
 type AnalysisResult = SingleResult | DiffResult;
 type Mode = "single" | "diff";
-type TabId = "summary" | "files" | "ds" | "a11y";
+type TabId = "summary" | "files" | "ds" | "a11y" | "commit" | "pr";
 
 function isDiffResult(r: AnalysisResult): r is DiffResult {
   return "files" in r && "stats" in r;
@@ -548,6 +565,14 @@ function ResultTabs({ result, activeTab, setActiveTab }: {
       count: result.a11y_issues.length,
       countColor: result.a11y_issues.length > 0 ? "var(--warning)" : "var(--success)",
     },
+    {
+      id: "commit" as const, label: "Commit", icon: "⎇",
+      hidden: !isDiff || !(result as DiffResult).commit,
+    },
+    {
+      id: "pr" as const, label: "PR", icon: "📋",
+      hidden: !isDiff || !(result as DiffResult).pr_template,
+    },
   ].filter(t => !t.hidden);
 
   const visibleIds = tabs.map(t => t.id);
@@ -689,6 +714,23 @@ function ResultTabs({ result, activeTab, setActiveTab }: {
             : result.a11y_issues.map((v, i) => <IssueCard key={i} {...v} />)
           }
         </div>
+
+        {/* Commit message */}
+        {isDiff && (result as DiffResult).commit && (
+          <div role="tabpanel" id="panel-commit" aria-labelledby="tab-commit"
+            hidden={activeTab !== "commit"} tabIndex={0}>
+            <CommitPanel commit={(result as DiffResult).commit!} />
+          </div>
+        )}
+
+        {/* PR Template */}
+        {isDiff && (result as DiffResult).pr_template && (
+          <div role="tabpanel" id="panel-pr" aria-labelledby="tab-pr"
+            hidden={activeTab !== "pr"} tabIndex={0}>
+            <PRTemplatePanel pr={(result as DiffResult).pr_template!} />
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -1007,6 +1049,154 @@ function IssueCard({
   );
 }
 
+// ── Commit Panel ────────────────────────────────────────────
+const COMMIT_TYPE_COLOR: Record<string, string> = {
+  feat: "var(--brand)",
+  fix: "var(--error)",
+  refactor: "var(--warning)",
+  style: "#a78bfa",
+  test: "var(--success)",
+  docs: "var(--text-tertiary)",
+  chore: "var(--text-tertiary)",
+  perf: "#06b6d4",
+};
+
+function CommitPanel({ commit }: { commit: CommitMessage }) {
+  const color = COMMIT_TYPE_COLOR[commit.type] ?? "var(--brand)";
+  const fullMessage = [
+    `${commit.type}${commit.scope ? `(${commit.scope})` : ""}: ${commit.description}`,
+    commit.body ? `\n${commit.body}` : "",
+    commit.breaking_change
+      ? `\nBREAKING CHANGE: ${commit.breaking_change_description ?? ""}`
+      : "",
+  ].filter(Boolean).join("").trim();
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+      {/* Type + scope badges */}
+      <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{
+          fontSize: "11px", fontWeight: 700, padding: "3px 10px",
+          borderRadius: "999px", background: `${color}20`, color,
+          border: `1px solid ${color}40`, fontFamily: "monospace",
+        }}>
+          {commit.type}
+        </span>
+        {commit.scope && (
+          <span style={{
+            fontSize: "11px", color: "var(--text-tertiary)",
+            fontFamily: "monospace", background: "var(--bg-overlay)",
+            padding: "3px 8px", borderRadius: "4px",
+          }}>
+            ({commit.scope})
+          </span>
+        )}
+        {commit.breaking_change && (
+          <span style={{
+            fontSize: "10px", fontWeight: 700, padding: "3px 8px",
+            borderRadius: "4px", background: "var(--error-bg)",
+            color: "var(--error)", border: "1px solid var(--error)40",
+            letterSpacing: ".04em",
+          }}>
+            BREAKING CHANGE
+          </span>
+        )}
+      </div>
+
+      {/* Full commit message box */}
+      <div style={{
+        background: "var(--bg-base)",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: "var(--r-md)",
+        padding: "14px 16px",
+        fontFamily: "monospace",
+        fontSize: "13px",
+        lineHeight: 1.7,
+        color: "var(--text-primary)",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      }}>
+        <span style={{ color }}>
+          {commit.type}{commit.scope ? `(${commit.scope})` : ""}
+        </span>
+        <span style={{ color: "var(--text-tertiary)" }}>: </span>
+        {commit.description}
+        {commit.body && (
+          <><br /><br /><span style={{ color: "var(--text-secondary)" }}>{commit.body}</span></>
+        )}
+        {commit.breaking_change && commit.breaking_change_description && (
+          <><br /><br /><span style={{ color: "var(--error)" }}>BREAKING CHANGE: {commit.breaking_change_description}</span></>
+        )}
+      </div>
+
+      <CopyButton text={fullMessage} />
+    </div>
+  );
+}
+
+// ── PR Template Panel ────────────────────────────────────────
+const CHECKLIST = [
+  "Code follows project conventions",
+  "Tests added/updated",
+  "No console.log left",
+  "DS tokens used (no hardcoded values)",
+  "Accessibility checked",
+];
+
+function PRTemplatePanel({ pr }: { pr: PRTemplate }) {
+  const markdown = `## What does this MR do?\n${pr.what}\n\n## How was this implemented?\n${pr.how}\n\n## How to test?\n${pr.testing}\n\n## Screenshots / Demo\n_Add screenshots here_\n\n## Checklist\n${CHECKLIST.map(c => `- [ ] ${c}`).join("\n")}`;
+
+  const Section = ({ title, content }: { title: string; content: string }) => (
+    <div style={{ marginBottom: "1.25rem" }}>
+      <p style={{
+        fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+        letterSpacing: ".08em", color: "var(--text-tertiary)",
+        marginBottom: "6px",
+      }}>
+        {title}
+      </p>
+      <p style={{
+        fontSize: "13px", color: "var(--text-secondary)",
+        lineHeight: 1.7, whiteSpace: "pre-wrap",
+      }}>
+        {content}
+      </p>
+    </div>
+  );
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+      <Section title="What does this MR do?" content={pr.what} />
+      <Section title="How was this implemented?" content={pr.how} />
+      <Section title="How to test?" content={pr.testing} />
+
+      {/* Checklist */}
+      <div style={{ marginBottom: "1.25rem" }}>
+        <p style={{
+          fontSize: "11px", fontWeight: 700, textTransform: "uppercase",
+          letterSpacing: ".08em", color: "var(--text-tertiary)", marginBottom: "8px",
+        }}>
+          Checklist
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+          {CHECKLIST.map((item) => (
+            <label key={item} style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              fontSize: "13px", color: "var(--text-secondary)", cursor: "pointer",
+            }}>
+              <input type="checkbox" style={{ accentColor: "var(--brand)", width: "14px", height: "14px" }} />
+              {item}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <CopyMarkdownButton text={markdown} />
+    </div>
+  );
+}
+
+// ── Pass / Fail message ──────────────────────────────────────
 function PassMessage({ text }: { text: string }) {
   return (
     <div style={{

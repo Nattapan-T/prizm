@@ -24,6 +24,21 @@ export type FileResult = {
   a11y_issues: A11yIssue[]
 }
 
+export type CommitMessage = {
+  type: 'feat' | 'fix' | 'refactor' | 'style' | 'test' | 'docs' | 'chore' | 'perf'
+  scope?: string
+  description: string
+  body?: string
+  breaking_change: boolean
+  breaking_change_description?: string
+}
+
+export type PRTemplate = {
+  what: string
+  how: string
+  testing: string
+}
+
 export type MergedResult = {
   summary: string
   ds_violations: Violation[]
@@ -36,12 +51,16 @@ export type MergedResult = {
     totalDsViolations: number
     totalA11yIssues: number
   }
+  commit?: CommitMessage
+  pr_template?: PRTemplate
 }
 
 export function mergeResults(
   fileResults: FileResult[],
   summary: string,
-  diffStats: ReturnType<typeof getDiffStats>
+  diffStats: ReturnType<typeof getDiffStats>,
+  commit?: CommitMessage | null,
+  prTemplate?: PRTemplate | null,
 ): MergedResult {
   const allDsViolations = fileResults.flatMap(f =>
     f.ds_violations.map(v => ({ ...v, filename: f.filename }))
@@ -62,5 +81,7 @@ export function mergeResults(
       totalDsViolations: allDsViolations.length,
       totalA11yIssues: allA11yIssues.length,
     },
+    ...(commit ? { commit } : {}),
+    ...(prTemplate ? { pr_template: prTemplate } : {}),
   }
 }

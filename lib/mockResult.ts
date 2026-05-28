@@ -87,4 +87,16 @@ export const MOCK_DIFF_RESULT: MergedResult = {
     totalDsViolations: 2,
     totalA11yIssues: 2,
   },
+  commit: {
+    type: "refactor",
+    scope: "Button,Modal",
+    description: "replace hardcoded values with tokens and fix a11y",
+    body: "Button now uses semantic color tokens instead of hardcoded hex values.\nModal overlay has proper keyboard accessibility with role and onKeyDown.\nClose button now has aria-label for screen reader support.",
+    breaking_change: false,
+  },
+  pr_template: {
+    what: "Refactored Button and Modal components to use semantic design tokens and improve accessibility compliance.",
+    how: "Replaced hardcoded hex color #1A73E8 with var(--color-primary) and spacing 13px with var(--spacing-3). Added role='button' and onKeyDown handler to the Modal overlay div. Added aria-label='Close modal' to the close button.",
+    testing: "1. Render Button — verify background color uses CSS variable, not hardcoded hex.\n2. Tab to Modal overlay — verify keyboard dismiss (Enter/Space) works correctly.\n3. Open with screen reader — verify close button is announced as 'Close modal'.",
+  },
 }

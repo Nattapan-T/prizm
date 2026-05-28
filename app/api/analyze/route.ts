@@ -7,7 +7,8 @@ import { MOCK_DIFF_RESULT } from '@/lib/mockResult'
 
 export const maxDuration = 60 // seconds — Vercel Hobby plan max
 
-// Schema เดิม — ใช้กับทั้ง single และ per-file
+// ── Schemas ─────────────────────────────────────────────────
+
 const AnalysisSchema = z.object({
   summary: z.string().describe('Plain English summary of what changed'),
   ds_violations: z.array(z.object({
@@ -26,7 +27,23 @@ const AnalysisSchema = z.object({
   })),
 })
 
-// Prompt สำหรับ single file (เดิม)
+const CommitSchema = z.object({
+  type: z.enum(['feat', 'fix', 'refactor', 'style', 'test', 'docs', 'chore', 'perf']),
+  scope: z.string().optional().describe('Component name or module, e.g. Button or auth'),
+  description: z.string().max(72).describe('Imperative, present tense, max 72 chars'),
+  body: z.string().optional().describe('Optional 2–3 line explanation of why, not what'),
+  breaking_change: z.boolean(),
+  breaking_change_description: z.string().optional(),
+})
+
+const PRTemplateSchema = z.object({
+  what: z.string().describe('What does this MR do? 2–3 sentences'),
+  how: z.string().describe('Key implementation decisions, 2–4 sentences'),
+  testing: z.string().describe('Step-by-step testing instructions'),
+})
+
+// ── Prompts ──────────────────────────────────────────────────
+
 const SINGLE_PROMPT = (code: string) => `
 You are a senior frontend engineer and Design System expert.
 Analyze the following code and return a structured analysis.
@@ -59,7 +76,6 @@ ${code}
 \`\`\`
 `
 
-// Prompt สำหรับ diff ของ 1 ไฟล์
 const DIFF_FILE_PROMPT = (filename: string, hunks: string) => `
 You are a senior frontend engineer and Design System expert.
 Analyze ONLY the changed lines (+ lines) in this git diff.
@@ -97,7 +113,6 @@ ${hunks}
 \`\`\`
 `
 
-// Prompt สำหรับ PR summary รวม
 const PR_SUMMARY_PROMPT = (
   fileSummaries: string[],
   stats: ReturnType<typeof getDiffStats>
@@ -110,6 +125,41 @@ ${fileSummaries.map((s, i) => `File ${i + 1}: ${s}`).join('\n')}
 
 Write a clear, professional PR summary in 2-4 sentences.
 Focus on what changed and why it matters.
+`
+
+const COMMIT_PROMPT = (diff: string) => `
+You are an expert at writing Conventional Commits.
+Analyze this git diff and generate a commit message.
+
+Format: <type>(<scope>): <description>
+
+Types: feat, fix, refactor, style, test, docs, chore, perf
+Scope: component name or module (optional, keep short)
+Description: imperative, present tense, max 72 chars
+
+For body: optional 2–3 line explanation of WHY (not what).
+For breaking_change: set true only if the API/interface changed in a non-backward-compatible way.
+
+Diff:
+\`\`\`diff
+${diff}
+\`\`\`
+`
+
+const PR_TEMPLATE_PROMPT = (diff: string) => `
+You are a senior engineer writing a GitLab/GitHub MR description.
+Analyze this diff and fill in the following fields:
+
+- what: What does this MR do? (2–3 sentences summarizing the change)
+- how: How was this implemented? (key technical decisions, 2–4 sentences)
+- testing: How to test? (step-by-step, numbered list as a plain string)
+
+Be specific and professional. Focus on the actual changes in the diff.
+
+Diff:
+\`\`\`diff
+${diff}
+\`\`\`
 `
 
 // ── Error handling ──────────────────────────────────────────
@@ -142,13 +192,18 @@ function parseRetryAfterSec(err: any): number {
   return match ? Math.ceil(parseFloat(match[1])) + 1 : 60
 }
 
-async function generateWithRetry(prompt: string, maxRetries = 3) {
+// Generic retry wrapper — works with any Zod schema
+async function generateWithSchema<T>(
+  schema: z.ZodType<T>,
+  prompt: string,
+  maxRetries = 3
+): Promise<T> {
   let lastError: unknown
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       const { object } = await generateObject({
         model: google('gemini-2.5-flash'),
-        schema: AnalysisSchema,
+        schema,
         prompt,
         maxRetries: 0,
       })
@@ -177,17 +232,17 @@ export async function POST(req: Request) {
 
     // ── Mock mode — dev only, no quota used ──────────────
     if (process.env.MOCK_API === 'true') {
-      await new Promise(r => setTimeout(r, 1500)) // simulate delay
+      await new Promise(r => setTimeout(r, 1500))
       return Response.json(MOCK_DIFF_RESULT)
     }
 
-    // ── Single file mode (เดิม) ──────────────────────────
+    // ── Single file mode ──────────────────────────────────
     if (mode === 'single') {
-      const result = await generateWithRetry(SINGLE_PROMPT(code))
+      const result = await generateWithSchema(AnalysisSchema, SINGLE_PROMPT(code))
       return Response.json(result)
     }
 
-    // ── Git diff mode (ใหม่) ─────────────────────────────
+    // ── Git diff mode ─────────────────────────────────────
     const parsed = parseDiff(code)
     const relevant = getRelevantFiles(parsed)
     const stats = getDiffStats(parsed)
@@ -199,28 +254,39 @@ export async function POST(req: Request) {
       }, { status: 422 })
     }
 
-    // วิเคราะห์แต่ละไฟล์ parallel
-    const fileAnalyses = await Promise.all(
-      relevant.map(async (file) => {
-        const result = await generateWithRetry(
-          DIFF_FILE_PROMPT(file.filename, file.hunks)
-        )
-        return {
-          filename: file.filename,
-          summary: result.summary,
-          ds_violations: result.ds_violations,
-          a11y_issues: result.a11y_issues,
-        }
-      })
-    )
+    // Run per-file analysis + commit + PR template in parallel
+    const [fileAnalyses, commitResult, prTemplateResult] = await Promise.all([
+      Promise.all(
+        relevant.map(async (file) => {
+          const result = await generateWithSchema(
+            AnalysisSchema,
+            DIFF_FILE_PROMPT(file.filename, file.hunks)
+          )
+          return {
+            filename: file.filename,
+            summary: result.summary,
+            ds_violations: result.ds_violations,
+            a11y_issues: result.a11y_issues,
+          }
+        })
+      ),
+      generateWithSchema(CommitSchema, COMMIT_PROMPT(code)).catch(() => null),
+      generateWithSchema(PRTemplateSchema, PR_TEMPLATE_PROMPT(code)).catch(() => null),
+    ])
 
-    // Generate PR summary รวม
-    const prSummaryResult = await generateWithRetry(
+    // PR summary needs file summaries — runs after file analyses
+    const prSummaryResult = await generateWithSchema(
+      AnalysisSchema,
       PR_SUMMARY_PROMPT(fileAnalyses.map(f => f.summary), stats)
     )
 
-    // Merge ทุกอย่าง
-    const merged = mergeResults(fileAnalyses, prSummaryResult.summary, stats)
+    const merged = mergeResults(
+      fileAnalyses,
+      prSummaryResult.summary,
+      stats,
+      commitResult,
+      prTemplateResult,
+    )
 
     return Response.json(merged)
 
