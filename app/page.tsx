@@ -662,7 +662,7 @@ function ResultTabs({ result, activeTab, setActiveTab }: {
           style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {result.ds_violations.length === 0
             ? <PassMessage text="No Design System violations detected" />
-            : result.ds_violations.map(({ filename: _f, ...v }, i) => <IssueCard key={i} {...v} />)
+            : result.ds_violations.map((v, i) => <IssueCard key={i} {...v} />)
           }
         </div>
 
@@ -672,7 +672,7 @@ function ResultTabs({ result, activeTab, setActiveTab }: {
           style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {result.a11y_issues.length === 0
             ? <PassMessage text="No accessibility issues detected" />
-            : result.a11y_issues.map(({ filename: _f, ...v }, i) => <IssueCard key={i} {...v} />)
+            : result.a11y_issues.map((v, i) => <IssueCard key={i} {...v} />)
           }
         </div>
       </div>
@@ -755,8 +755,8 @@ function FileCard({ file }: { file: FileResult }) {
           {totalIssues === 0
             ? <PassMessage text="No issues found in this file" />
             : <>
-                {file.ds_violations.map(({ filename: _f, ...v }, i) => <IssueCard key={`ds-${i}`} {...v} />)}
-                {file.a11y_issues.map(({ filename: _f, ...v }, i) => <IssueCard key={`a11y-${i}`} {...v} />)}
+                {file.ds_violations.map((v, i) => <IssueCard key={`ds-${i}`} {...v} filename={file.filename} />)}
+                {file.a11y_issues.map((v, i) => <IssueCard key={`a11y-${i}`} {...v} filename={file.filename} />)}
               </>
           }
         </div>
@@ -772,6 +772,7 @@ function IssueCard({
   severity,
   wcag,
   line,
+  filename,
 }: {
   code?: string;
   issue: string;
@@ -779,11 +780,22 @@ function IssueCard({
   severity: "error" | "warning" | "info";
   wcag?: string;
   line?: number;
+  filename?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const sevLabel =
     severity === "error" ? "Error" : severity === "warning" ? "Warning" : "Info";
+
+  const fileRef = filename ? (line ? `${filename}:${line}` : filename) : null;
+  const copyPath = (e: React.MouseEvent) => {
+    e.stopPropagation(); // don't toggle expand
+    if (!fileRef) return;
+    navigator.clipboard.writeText(fileRef);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
 
   return (
     <article
@@ -838,6 +850,32 @@ function IssueCard({
           }}>
             {code}
           </span>
+        )}
+
+        {/* Filename chip — copyable, CMD+P friendly */}
+        {fileRef && (
+          <button
+            onClick={copyPath}
+            title={copied ? "Copied!" : `Copy path: ${fileRef}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "3px",
+              padding: "2px 7px",
+              borderRadius: "4px",
+              border: "none",
+              background: copied ? "var(--success-bg)" : "var(--bg-overlay)",
+              color: copied ? "var(--success)" : "var(--text-tertiary)",
+              fontFamily: "monospace",
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all .15s",
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ opacity: 0.6, fontSize: "10px" }}>{copied ? "✓" : "⎘"}</span>
+            {filename!.split("/").pop()}{line ? `:${line}` : ""}
+          </button>
         )}
 
         {/* Issue summary — truncate when collapsed */}
