@@ -662,7 +662,7 @@ function ResultTabs({ result, activeTab, setActiveTab }: {
           style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {result.ds_violations.length === 0
             ? <PassMessage text="No Design System violations detected" />
-            : result.ds_violations.map((v, i) => <IssueCard key={i} {...v} />)
+            : result.ds_violations.map(({ filename: _f, ...v }, i) => <IssueCard key={i} {...v} />)
           }
         </div>
 
@@ -672,7 +672,7 @@ function ResultTabs({ result, activeTab, setActiveTab }: {
           style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {result.a11y_issues.length === 0
             ? <PassMessage text="No accessibility issues detected" />
-            : result.a11y_issues.map((v, i) => <IssueCard key={i} {...v} />)
+            : result.a11y_issues.map(({ filename: _f, ...v }, i) => <IssueCard key={i} {...v} />)
           }
         </div>
       </div>
@@ -755,8 +755,8 @@ function FileCard({ file }: { file: FileResult }) {
           {totalIssues === 0
             ? <PassMessage text="No issues found in this file" />
             : <>
-                {file.ds_violations.map((v, i) => <IssueCard key={`ds-${i}`} {...v} filename={file.filename} />)}
-                {file.a11y_issues.map((v, i) => <IssueCard key={`a11y-${i}`} {...v} filename={file.filename} />)}
+                {file.ds_violations.map(({ filename: _f, ...v }, i) => <IssueCard key={`ds-${i}`} {...v} />)}
+                {file.a11y_issues.map(({ filename: _f, ...v }, i) => <IssueCard key={`a11y-${i}`} {...v} />)}
               </>
           }
         </div>
@@ -765,82 +765,192 @@ function FileCard({ file }: { file: FileResult }) {
   );
 }
 
-function IssueCard({ code, issue, fix, severity, wcag, line, filename }: {
-  code?: string; issue: string; fix: string;
-  severity: "error" | "warning" | "info"; wcag?: string; line?: number; filename?: string;
+function IssueCard({
+  code,
+  issue,
+  fix,
+  severity,
+  wcag,
+  line,
+}: {
+  code?: string;
+  issue: string;
+  fix: string;
+  severity: "error" | "warning" | "info";
+  wcag?: string;
+  line?: number;
 }) {
-  const fileRef = filename ? (line ? `${filename}:${line}` : filename) : null;
-  const [copiedPath, setCopiedPath] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
-  const copyPath = () => {
-    if (!fileRef) return;
-    navigator.clipboard.writeText(fileRef);
-    setCopiedPath(true);
-    setTimeout(() => setCopiedPath(false), 1500);
-  };
+  const sevLabel =
+    severity === "error" ? "Error" : severity === "warning" ? "Warning" : "Info";
 
   return (
     <article
-      aria-label={`${severity}: ${issue}`}
+      aria-label={`${sevLabel}: ${issue}`}
       style={{
         background: SEV_BG[severity],
         border: `1px solid ${SEV_COLOR[severity]}30`,
         borderRadius: "var(--r-md)",
-        padding: "1rem",
-        transition: "all 0.2s ease",
+        overflow: "hidden",
+        transition: "all 0.15s ease",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+      {/* Header — always visible, click to expand */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "10px 12px",
+          background: "transparent",
+          border: "none",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        {/* Severity badge */}
         <span style={{
-          fontSize: "10px", fontWeight: 700, textTransform: "uppercase",
-          letterSpacing: "0.08em", padding: "4px 8px", borderRadius: "4px",
-          background: `${SEV_COLOR[severity]}25`, color: SEV_COLOR[severity],
-        }}>{severity}</span>
+          fontSize: "10px",
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          padding: "3px 7px",
+          borderRadius: "4px",
+          background: `${SEV_COLOR[severity]}25`,
+          color: SEV_COLOR[severity],
+          flexShrink: 0,
+        }}>
+          {severity}
+        </span>
 
-        {/* File path chip — copyable, CMD+P friendly */}
-        {fileRef && (
-          <button
-            onClick={copyPath}
-            title={copiedPath ? "Copied!" : `Copy path: ${fileRef}`}
-            style={{
-              display: "flex", alignItems: "center", gap: "4px",
-              padding: "2px 8px", borderRadius: "4px", border: "none",
-              background: copiedPath ? "var(--success-bg)" : "var(--bg-overlay)",
-              color: copiedPath ? "var(--success)" : "var(--text-tertiary)",
-              fontFamily: "monospace", fontSize: "11px",
-              cursor: "pointer", transition: "all .15s",
-            }}
-          >
-            <span style={{ opacity: 0.6, fontSize: "10px" }}>{copiedPath ? "✓" : "⎘"}</span>
-            {filename!.split("/").pop()}{line ? `:${line}` : ""}
-          </button>
+        {/* Rule code */}
+        {code && (
+          <span style={{
+            fontSize: "11px",
+            fontFamily: "monospace",
+            fontWeight: 600,
+            color: SEV_COLOR[severity],
+            flexShrink: 0,
+          }}>
+            {code}
+          </span>
         )}
 
-        {!fileRef && line && (
-          <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>Line {line}</span>
+        {/* Issue summary — truncate when collapsed */}
+        <span style={{
+          fontSize: "12px",
+          color: "var(--text-secondary)",
+          flex: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: expanded ? "normal" : "nowrap",
+          lineHeight: 1.4,
+        }}>
+          {issue}
+        </span>
+
+        {/* Line number */}
+        {line && (
+          <span style={{
+            fontSize: "10px",
+            color: "var(--text-tertiary)",
+            fontFamily: "monospace",
+            flexShrink: 0,
+          }}>
+            :{line}
+          </span>
         )}
 
+        {/* WCAG badge */}
         {wcag && (
           <span style={{
-            fontSize: "10px", color: "var(--text-tertiary)", marginLeft: "auto",
-            fontFamily: "monospace", background: "var(--bg-overlay)", padding: "2px 6px", borderRadius: "4px",
-          }}>WCAG {wcag}</span>
+            fontSize: "10px",
+            color: "var(--text-tertiary)",
+            fontFamily: "monospace",
+            background: "var(--bg-overlay)",
+            padding: "2px 5px",
+            borderRadius: "4px",
+            flexShrink: 0,
+          }}>
+            {wcag.split("/")[0].trim()}
+          </span>
         )}
-      </div>
-      {code && (
+
+        {/* Expand icon */}
+        <span style={{
+          fontSize: "10px",
+          color: "var(--text-tertiary)",
+          flexShrink: 0,
+          transition: "transform .15s",
+          transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+          display: "inline-block",
+        }}>
+          ▼
+        </span>
+      </button>
+
+      {/* Detail — only when expanded */}
+      {expanded && (
         <div style={{
-          background: "var(--bg-base)", border: "1px solid var(--border-subtle)",
-          borderRadius: "var(--r-sm)", padding: "0.5rem 0.75rem",
-          fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: "12px",
-          color: "var(--text-secondary)", marginBottom: "0.75rem", overflowX: "auto", whiteSpace: "nowrap",
-        }}>{code}</div>
+          padding: "0 12px 12px",
+          borderTop: `1px solid ${SEV_COLOR[severity]}20`,
+          paddingTop: "10px",
+        }}>
+          {/* Code snippet */}
+          {code && (
+            <div style={{
+              background: "var(--bg-base)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "var(--r-sm)",
+              padding: "6px 10px",
+              fontFamily: "monospace",
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              marginBottom: "8px",
+              overflowX: "auto",
+              whiteSpace: "nowrap",
+            }}>
+              {code}
+            </div>
+          )}
+
+          {/* Full issue */}
+          <p style={{
+            fontSize: "13px",
+            color: "var(--text-primary)",
+            marginBottom: "6px",
+            lineHeight: 1.6,
+            fontWeight: 500,
+          }}>
+            {issue}
+          </p>
+
+          {/* Fix */}
+          <p style={{
+            fontSize: "13px",
+            color: "var(--success)",
+            lineHeight: 1.6,
+          }}>
+            ✦ {fix}
+          </p>
+
+          {/* Full WCAG ref */}
+          {wcag && (
+            <p style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              marginTop: "6px",
+              fontFamily: "monospace",
+            }}>
+              WCAG {wcag}
+            </p>
+          )}
+        </div>
       )}
-      <p style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "0.5rem", lineHeight: 1.6, fontWeight: 500 }}>
-        {issue}
-      </p>
-      <p style={{ fontSize: "13px", color: "var(--success)", lineHeight: 1.6, fontWeight: 400 }}>
-        ✦ {fix}
-      </p>
     </article>
   );
 }
