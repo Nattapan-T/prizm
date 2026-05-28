@@ -1,0 +1,184 @@
+@import "tailwindcss";
+
+:root {
+  /* Background layers - Terminal-inspired dark theme */
+  --bg-base: #0b0f19;
+  --bg-surface: #111827;
+  --bg-elevated: #1f2937;
+  --bg-overlay: #374151;
+
+  /* Borders */
+  --border-subtle: #1f2937;
+  --border-default: #374151;
+  --border-strong: #4b5563;
+
+  /* Text - High contrast for WCAG AA */
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-tertiary: #9ca3af;
+
+  /* Brand - Indigo/Cyber for AI & Crystal theme */
+  --brand: #6366f1;
+  --brand-glow: #6366f140;
+  --brand-subtle: #6366f120;
+
+  /* Semantic colors with proper contrast */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+
+  /* Semantic backgrounds */
+  --success-bg: #0a2e1a;
+  --warning-bg: #2a1800;
+  --error-bg:   #2a0d0d;
+  --info-bg:    #0d1f3a;
+
+  /* Radius */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: -apple-system, "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 999px;
+}
+
+/* Selection */
+::selection {
+  background: var(--brand-glow);
+  color: var(--text-primary);
+}
+
+/* Skip to main content — keyboard users */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  padding: .5rem 1rem;
+  background: var(--brand);
+  color: #fff;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  z-index: 999;
+  transition: top .15s;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* Focus ring — ทุก interactive element */
+button:focus-visible,
+a:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+/* aria-busy loading state */
+[aria-busy="true"] {
+  cursor: wait;
+  opacity: .7;
+}
+
+/* Loading animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* CSS Loader — square border spin (css-loaders.com/shapes) — used in button */
+.loader-btn {
+  width: 20px;
+  aspect-ratio: 1;
+  display: grid;
+  flex-shrink: 0;
+}
+.loader-btn:before,
+.loader-btn:after {
+  content: "";
+  grid-area: 1/1;
+  --c: #0000 calc(100%/3), #818cf8 0 calc(2*100%/3), #0000 0;
+  --c1: linear-gradient(90deg, var(--c));
+  --c2: linear-gradient( 0deg, var(--c));
+  background: var(--c1), var(--c2), var(--c1), var(--c2);
+  background-size: 300% 3px, 3px 300%;
+  background-repeat: no-repeat;
+  animation: l11 1s infinite linear;
+}
+.loader-btn:after {
+  margin: 5px;
+  transform: scaleX(-1);
+  animation-delay: -.25s;
+}
+@keyframes l11 {
+  0%    { background-position: 50%  0,   100% 100%, 0    100%, 0 0; }
+  25%   { background-position: 0    0,   100% 50%,  0    100%, 0 0; }
+  50%   { background-position: 0    0,   100% 0,    50%  100%, 0 0; }
+  75%   { background-position: 0    0,   100% 0,    100% 100%, 0 50%; }
+  75.01%{ background-position: 100% 0,   100% 0,    100% 100%, 0 50%; }
+  100%  { background-position: 50%  0,   100% 0,    100% 100%, 0 100%; }
+}
+
+/* CSS Loader — progress bar (css-loaders.com/shapes) */
+.loader {
+  width: 120px;
+  height: 22px;
+  border-radius: 20px;
+  color: var(--brand);
+  border: 2px solid;
+  position: relative;
+}
+.loader::before {
+  content: "";
+  position: absolute;
+  margin: 2px;
+  inset: 0 100% 0 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: l6 2s infinite;
+}
+@keyframes l6 {
+  100% { inset: 0; }
+}

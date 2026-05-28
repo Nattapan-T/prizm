@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm add *)",
+      "Bash(pnpm dev *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/analyze -H 'Content-Type: application/json' -d '{\"code\": \"<button style={{color: \\\\\"#1A73E8\\\\\"}}>Click</button>\"}')",
+      "Bash(python3 -m json.tool)",
+      "Bash(node *)",
+      "Read(//Users/fahsaitj/Documents/**)",
+      "Bash(rm -f prism.zip)",
+      "Bash(zip -r prism.zip prism --exclude prism/node_modules/* --exclude prism/.next/* --exclude prism/.git/*)",
+      "Bash(curl -s -X POST http://localhost:3000/api/analyze -H 'Content-Type: application/json' -d '{\"code\": \"<button style={{color: \\\\\"#f00\\\\\"}}>Test</button>\"}')",
+      "Bash(gh auth *)",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'feat: initial PRizm release *)"
+    ]
+  }
+}
